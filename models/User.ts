@@ -8,7 +8,15 @@ export interface IUser {
   createdAt: Date;
 }
 
-const UserSchema = new mongoose.Schema<IUser>({
+// Define methods interface
+interface IUserMethods {
+  comparePassword(candidatePassword: string): Promise<boolean>;
+}
+
+// Create a new Model type that knows about IUserMethods
+type UserModel = mongoose.Model<IUser, {}, IUserMethods>;
+
+const UserSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>({
   name: {
     type: String,
     required: [true, 'Please provide a name'],
@@ -39,7 +47,7 @@ const UserSchema = new mongoose.Schema<IUser>({
 });
 
 // Hash password before saving
-UserSchema.pre('save', async function(next) {
+UserSchema.pre('save', async function(this: IUser & mongoose.Document, next: mongoose.CallbackWithoutResultAndOptionalError) {
   if (!this.isModified('password')) return next();
   
   try {
@@ -51,8 +59,8 @@ UserSchema.pre('save', async function(next) {
   }
 });
 
-// Add comparePassword method
-UserSchema.methods.comparePassword = async function(candidatePassword: string) {
+// Compare password method
+UserSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
@@ -61,5 +69,5 @@ UserSchema.methods.comparePassword = async function(candidatePassword: string) {
 };
 
 // Check if model exists before creating new one
-const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+const User = mongoose.models.User || mongoose.model<IUser, UserModel>('User', UserSchema);
 export default User;
